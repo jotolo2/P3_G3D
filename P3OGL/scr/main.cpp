@@ -23,6 +23,10 @@ glm::mat4	view = glm::mat4(1.0f);
 glm::mat4	modelCube1 = glm::mat4(1.0f);
 glm::mat4	modelCube2 = glm::mat4(1.0f);
 glm::vec4	lightPos = glm::vec4(0.0f);
+glm::vec3	lightAmb = glm::vec3(0.3f);
+glm::vec3	lightDif = glm::vec3(1.0f);
+glm::vec3	lightSpec = glm::vec3(1.0f);
+
 
 
 //////////////////////////////////////////////////////////////
@@ -40,6 +44,9 @@ int uNormalMat;
 int uColorTex;
 int uEmiTex;
 int uLightPos;
+int uLightAmb;
+int uLightDif;
+int uLightSpec;
 
 //Texturas
 unsigned int colorTexId;
@@ -215,6 +222,9 @@ void initShader(const char *vname, const char *fname)
 	uColorTex = glGetUniformLocation(program, "colorTex");
 	uEmiTex = glGetUniformLocation(program, "emiTex");
 	uLightPos = glGetUniformLocation(program, "lightPos");
+	uLightAmb = glGetUniformLocation(program, "Ia");
+	uLightDif = glGetUniformLocation(program, "Id");
+	uLightSpec = glGetUniformLocation(program, "Is");
 }
 
 
@@ -267,6 +277,10 @@ void initObj()
 	modelCube1 = glm::mat4(1.0f);
 	modelCube2 = glm::mat4(1.0f);
 	lightPos = glm::vec4(-4.0f, 0.0f, 0.0f, 1.0f);
+
+	lightAmb = glm::vec3(0.3f);
+	lightDif = glm::vec3(1.0f);
+	lightSpec = glm::vec3(1.0f);
 }
 
 
@@ -386,6 +400,9 @@ void renderFunc()
 	lightPos.w = 1;
 	glm::vec4 light = view * lightPos;
 	glUniform4fv(uLightPos, 1, &light[0]);
+	glUniform3fv(uLightAmb, 1, &lightAmb[0]);
+	glUniform3fv(uLightDif, 1, &lightDif[0]);
+	glUniform3fv(uLightSpec, 1, &lightSpec[0]);
 
 	//Dibujado de un tercer cubo con la posicion de la luz
 	glm::mat4 modelLight = glm::mat4(1.0);
@@ -411,6 +428,8 @@ void renderFunc()
 void resizeFunc(int width, int height)
 {
 	glViewport(0, 0, width, height);
+	float aspectRatio = float(width) / float(height);
+	proj = glm::perspective(glm::radians(60.0f), aspectRatio, 0.1f, 50.0f);
 	glutPostRedisplay();
 }
 
@@ -451,6 +470,29 @@ void keyboardFunc(unsigned char key, int x, int y)
 		lightPos.z += lightStep;
 		break;
 
+	case('1'):
+		lightAmb = glm::min(lightAmb+glm::vec3(0.1f), glm::vec3(1.0f));
+		break;
+
+	case('2'):
+		lightAmb = glm::max(lightAmb-glm::vec3(0.1f), glm::vec3(0.0f));
+		break;
+
+	case('3'):
+		lightDif = glm::min(lightDif+glm::vec3(0.1f), glm::vec3(1.0f));
+		break;
+
+	case('4'):
+		lightDif = glm::max(lightDif-glm::vec3(0.1f), glm::vec3(0.0f));
+		break;
+
+	case('5'):
+		lightSpec = glm::min(lightSpec+glm::vec3(0.1f), glm::vec3(1.0f));
+		break;
+
+	case('6'):
+		lightSpec = glm::max(lightSpec-glm::vec3(0.1f), glm::vec3(0.0f));
+		break;
 
 
 	}
