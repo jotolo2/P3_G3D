@@ -20,36 +20,40 @@
 //Matrices
 glm::mat4	proj = glm::mat4(1.0f);
 glm::mat4	view = glm::mat4(1.0f);
-glm::mat4	modelCube1 = glm::mat4(1.0f);
-glm::mat4	modelCube2 = glm::mat4(1.0f);
-glm::vec4	lightPos = glm::vec4(0.0f);
-glm::vec3	lightAmb = glm::vec3(0.3f);
-glm::vec3	lightDif = glm::vec3(1.0f);
-glm::vec3	lightSpec = glm::vec3(1.0f);
-
-
+glm::mat4	modelCube1;
+glm::mat4	modelCube2;
+glm::vec4	lightPos;
+glm::vec3	lightAmb;
+glm::vec3	lightDif;
+glm::vec3	lightSpec;
 
 //////////////////////////////////////////////////////////////
 // Variables que nos dan acceso a Objetos OpenGL
 //////////////////////////////////////////////////////////////
 //Por definir
-unsigned int vshader;
-unsigned int fshader;
-unsigned int program;
+unsigned int vshader[3];
+unsigned int fshader[3];
+unsigned int program[3];
+
 
 //Variables Uniform
-int uModelViewMat;
-int uModelViewProjMat;
-int uNormalMat;
-int uColorTex;
-int uEmiTex;
-int uLightPos;
-int uLightAmb;
-int uLightDif;
-int uLightSpec;
+struct Uniforms {
+	int uModelViewMat;
+	int uModelViewProjMat;
+	int uNormalMat;
+	int uColorTex;
+	int uEmiTex;
+	int uLightPos;
+	int uLightAmb;
+	int uLightDif;
+	int uLightSpec;
+};
+
+Uniforms uniforms[3];
+
 
 //Texturas
-unsigned int colorTexId;
+unsigned int colorTexId1, colorTexId2;
 unsigned int emiTexId;
 
 //Atributos
@@ -84,7 +88,7 @@ void mouseFunc(int button, int state, int x, int y);
 //Funciones de inicialización y destrucción
 void initContext(int argc, char** argv);
 void initOGL();
-void initShader(const char *vname, const char *fname);
+void initShader(const char *vname, const char *fname, unsigned int &, unsigned int &, unsigned int &, size_t);
 void initObj();
 void destroy();
 
@@ -105,7 +109,10 @@ int main(int argc, char** argv)
 
 	initContext(argc, argv);
 	initOGL();
-	initShader("../shaders_P3/shader.v1.vert", "../shaders_P3/shader.v1.frag");
+	initShader("../shaders_P3/shader.v1.vert", "../shaders_P3/shader.v1.frag", program[0], vshader[0], fshader[0], 0);
+	initShader("../shaders_P3/shader.v2.vert", "../shaders_P3/shader.v2.frag", program[1], vshader[1], fshader[1], 1);
+	initShader("../shaders_P3/shader.v3.vert", "../shaders_P3/shader.v3.frag", program[2], vshader[2], fshader[2], 2);
+
 	initObj();
 
 	glutMainLoop();
@@ -163,24 +170,28 @@ void initOGL()
 
 void destroy()
 {
-	glDetachShader(program, vshader);
-	glDetachShader(program, fshader);
-	glDeleteShader(vshader);
-	glDeleteShader(fshader);
-	glDeleteProgram(program);
-
+	for (int i = 0; i < 3; ++i)
+	{
+		glDetachShader(program[i], vshader[i]);
+		glDetachShader(program[i], fshader[i]);
+		glDeleteShader(vshader[i]);
+		glDeleteShader(fshader[i]);
+		glDeleteProgram(program[i]);
+	}
+	
 	if (inPos != -1) glDeleteBuffers(1, &posVBO);
 	if (inColor != -1) glDeleteBuffers(1, &colorVBO);
 	if (inNormal != -1) glDeleteBuffers(1, &normalVBO);
 	if (inTexCoord != -1) glDeleteBuffers(1, &texCoordVBO);
-	glDeleteTextures(1, &colorTexId);
+	glDeleteTextures(1, &colorTexId1);
+	glDeleteTextures(1, &colorTexId2);
 	glDeleteTextures(1, &emiTexId);
 	glDeleteBuffers(1, &triangleIndexVBO);
 	glDeleteVertexArrays(1, &vao);
 
 }
 
-void initShader(const char *vname, const char *fname)
+void initShader(const char *vname, const char *fname, unsigned int & program, unsigned int & vshader, unsigned int & fshader, size_t i)
 {
 	vshader = loadShader(vname, GL_VERTEX_SHADER);
 	fshader = loadShader(fname, GL_FRAGMENT_SHADER);
@@ -216,15 +227,15 @@ void initShader(const char *vname, const char *fname)
 	inNormal = glGetAttribLocation(program, "inNormal");
 	inTexCoord = glGetAttribLocation(program, "inTexCoord");
 
-	uNormalMat = glGetUniformLocation(program, "normal");
-	uModelViewMat = glGetUniformLocation(program, "modelView");
-	uModelViewProjMat = glGetUniformLocation(program, "modelViewProj");
-	uColorTex = glGetUniformLocation(program, "colorTex");
-	uEmiTex = glGetUniformLocation(program, "emiTex");
-	uLightPos = glGetUniformLocation(program, "lightPos");
-	uLightAmb = glGetUniformLocation(program, "Ia");
-	uLightDif = glGetUniformLocation(program, "Id");
-	uLightSpec = glGetUniformLocation(program, "Is");
+	uniforms[i].uNormalMat = glGetUniformLocation(program, "normal");
+	uniforms[i].uModelViewMat = glGetUniformLocation(program, "modelView");
+	uniforms[i].uModelViewProjMat = glGetUniformLocation(program, "modelViewProj");
+	uniforms[i].uColorTex = glGetUniformLocation(program, "colorTex");
+	uniforms[i].uEmiTex = glGetUniformLocation(program, "emiTex");
+	uniforms[i].uLightPos = glGetUniformLocation(program, "lightPos");
+	uniforms[i].uLightAmb = glGetUniformLocation(program, "Ia");
+	uniforms[i].uLightDif = glGetUniformLocation(program, "Id");
+	uniforms[i].uLightSpec = glGetUniformLocation(program, "Is");
 }
 
 
@@ -271,13 +282,13 @@ void initObj()
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeNTriangleIndex * sizeof(unsigned int) * 3, cubeTriangleIndex, GL_STATIC_DRAW);
 
 
-	colorTexId = loadTex("../img/color2.png");
+	colorTexId1 = loadTex("../img/color2.png");
+	colorTexId2 = loadTex("../img/gioconda.png");
 	emiTexId = loadTex("../img/emissive.png");
 
 	modelCube1 = glm::mat4(1.0f);
 	modelCube2 = glm::mat4(1.0f);
 	lightPos = glm::vec4(-4.0f, 0.0f, 0.0f, 1.0f);
-
 	lightAmb = glm::vec3(0.3f);
 	lightDif = glm::vec3(1.0f);
 	lightSpec = glm::vec3(1.0f);
@@ -349,62 +360,91 @@ unsigned int loadTex(const char *fileName)
 void renderFunc()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glUseProgram(program);
-	//? pintado del objeto!!!!
+
+	//Dibujado del primer cubo
+	glUseProgram(program[0]);
+	//Luz
+	glm::vec4 light = view * lightPos;
+	glUniform4fv(uniforms[0].uLightPos, 1, &light[0]);
+	glUniform3fv(uniforms[0].uLightAmb, 1, &lightAmb[0]);
+	glUniform3fv(uniforms[0].uLightDif, 1, &lightDif[0]);
+	glUniform3fv(uniforms[0].uLightSpec, 1, &lightSpec[0]);
 
 	//Texturas
-	if (uColorTex != -1)
+	if (uniforms[0].uColorTex != -1)
 	{
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, colorTexId);
-		glUniform1i(uColorTex, 0);
+		glBindTexture(GL_TEXTURE_2D, colorTexId1);
+		glUniform1i(uniforms[0].uColorTex, 0);
 	}
-	if (uEmiTex != -1)
+	if (uniforms[0].uEmiTex != -1)
 	{
 		glActiveTexture(GL_TEXTURE0 + 1);
 		glBindTexture(GL_TEXTURE_2D, emiTexId);
-		glUniform1i(uEmiTex, 1);
+		glUniform1i(uniforms[0].uEmiTex, 1);
 	}
 
-	//Dibujado del primer cubo
 	glm::mat4 modelView = view * modelCube1;
 	glm::mat4 modelViewProj = proj * view * modelCube1;
 	glm::mat4 normal = glm::transpose(glm::inverse(modelView));
 
-	if (uModelViewMat != -1)
-		glUniformMatrix4fv(uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
-	if (uModelViewProjMat != -1)
-		glUniformMatrix4fv(uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uNormalMat != -1)
-		glUniformMatrix4fv(uNormalMat, 1, GL_FALSE,	&(normal[0][0]));
+	if (uniforms[0].uModelViewMat != -1)
+		glUniformMatrix4fv(uniforms[0].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
+	if (uniforms[0].uModelViewProjMat != -1)
+		glUniformMatrix4fv(uniforms[0].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+	if (uniforms[0].uNormalMat != -1)
+		glUniformMatrix4fv(uniforms[0].uNormalMat, 1, GL_FALSE,	&(normal[0][0]));
 
 	glBindVertexArray(vao);
 	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 
 	//Dibujado del segundo cubo
-	modelCube2[3].x = 4.0f;
+	glUseProgram(program[1]);
+	//Luz
+	light = view * lightPos;
+	glUniform4fv(uniforms[1].uLightPos, 1, &light[0]);
+	glUniform3fv(uniforms[1].uLightAmb, 1, &lightAmb[0]);
+	glUniform3fv(uniforms[1].uLightDif, 1, &lightDif[0]);
+	glUniform3fv(uniforms[1].uLightSpec, 1, &lightSpec[0]);
+
+	//Texturas
+	if (uniforms[1].uColorTex != -1)
+	{
+		glActiveTexture(GL_TEXTURE0 + 2);
+		glBindTexture(GL_TEXTURE_2D, colorTexId2);
+		glUniform1i(uniforms[1].uColorTex, 2);
+	}
+
 	modelView = view * modelCube2;
 	modelViewProj = proj * modelView;
 	normal = glm::transpose(glm::inverse(modelView));
 
-	if (uModelViewMat != -1)
-		glUniformMatrix4fv(uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
-	if (uModelViewProjMat != -1)
-		glUniformMatrix4fv(uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uNormalMat != -1)
-		glUniformMatrix4fv(uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+	if (uniforms[1].uModelViewMat != -1)
+		glUniformMatrix4fv(uniforms[1].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
+	if (uniforms[1].uModelViewProjMat != -1)
+		glUniformMatrix4fv(uniforms[1].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+	if (uniforms[1].uNormalMat != -1)
+		glUniformMatrix4fv(uniforms[1].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
 
 	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 
-	//Luz
-	lightPos.w = 1;
-	glm::vec4 light = view * lightPos;
-	glUniform4fv(uLightPos, 1, &light[0]);
-	glUniform3fv(uLightAmb, 1, &lightAmb[0]);
-	glUniform3fv(uLightDif, 1, &lightDif[0]);
-	glUniform3fv(uLightSpec, 1, &lightSpec[0]);
-
 	//Dibujado de un tercer cubo con la posicion de la luz
+	glUseProgram(program[2]);
+	//Luz
+	light = view * lightPos;
+	glUniform4fv(uniforms[2].uLightPos, 1, &light[0]);
+	glUniform3fv(uniforms[2].uLightAmb, 1, &lightAmb[0]);
+	glUniform3fv(uniforms[2].uLightDif, 1, &lightDif[0]);
+	glUniform3fv(uniforms[2].uLightSpec, 1, &lightSpec[0]);
+
+	//Texturas
+	if (uniforms[2].uColorTex != -1)
+	{
+		glActiveTexture(GL_TEXTURE0 + 2);
+		glBindTexture(GL_TEXTURE_2D, colorTexId2);
+		glUniform1i(uniforms[2].uColorTex, 2);
+	}
+
 	glm::mat4 modelLight = glm::mat4(1.0);
 	modelLight[3].x = lightPos.x;
 	modelLight[3].y = lightPos.y;
@@ -413,12 +453,13 @@ void renderFunc()
 	modelViewProj = proj * view * modelLight;
 	normal = glm::transpose(glm::inverse(modelLight));
 
-	if (uModelViewMat != -1)
-		glUniformMatrix4fv(uModelViewMat, 1, GL_FALSE, &(modelLight[0][0]));
-	if (uModelViewProjMat != -1)
-		glUniformMatrix4fv(uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uNormalMat != -1)
-		glUniformMatrix4fv(uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+	if (uniforms[2].uModelViewMat != -1)
+		glUniformMatrix4fv(uniforms[2].uModelViewMat, 1, GL_FALSE, &(modelLight[0][0]));
+	if (uniforms[2].uModelViewProjMat != -1)
+		glUniformMatrix4fv(uniforms[2].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+	if (uniforms[12].uNormalMat != -1)
+		glUniformMatrix4fv(uniforms[2].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+
 	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 
 	glutSwapBuffers();
@@ -436,10 +477,18 @@ void resizeFunc(int width, int height)
 
 void idleFunc()
 {
-	modelCube1 = glm::mat4(1.0f);
 	static float angle = 0.0f;
 	angle = (angle > 3.141592f * 2.0f) ? 0 : angle + 0.01f;
+	float radius = 3.0f;
+	float x = radius * glm::cos(angle);
+	float y = radius * glm::sin(angle);
+
+	modelCube1 = glm::mat4(1.0f);
 	modelCube1 = glm::rotate(modelCube1, angle, glm::vec3(1.0f, 1.0f, 0.0f));
+
+	modelCube2 = glm::mat4(1.0f);
+	modelCube2 = glm::translate(modelCube2, glm::vec3(x, y, x));
+	modelCube2 = glm::rotate(modelCube2, angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
 	glutPostRedisplay();
 }
