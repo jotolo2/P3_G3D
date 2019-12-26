@@ -20,8 +20,7 @@
 //Matrices
 glm::mat4	proj = glm::mat4(1.0f);
 glm::mat4	view = glm::mat4(1.0f);
-glm::mat4	modelCube1;
-glm::mat4	modelCube2;
+glm::mat4	model[3];
 glm::vec4	lightPos;
 glm::vec3	lightAmb;
 glm::vec3	lightDif;
@@ -48,28 +47,33 @@ struct Uniforms {
 	int uLightDif;
 	int uLightSpec;
 };
-
 Uniforms uniforms[3];
 
-
 //Texturas
-unsigned int colorTexId1, colorTexId2;
-unsigned int emiTexId;
+unsigned int colorTexId1, colorTexId2, emiTexId;
 
 //Atributos
-int inPos;
-int inColor;
-int inNormal;
-int inTexCoord;
+struct Attributes {
+	int inPos;
+	int inColor;
+	int inNormal;
+	int inTexCoord;
+};
+Attributes attributes[3];
+
 
 //VAO
-unsigned int vao;
+unsigned int vao[3];
 //VBOs que forman parte del objeto
-unsigned int posVBO;
-unsigned int colorVBO;
-unsigned int normalVBO;
-unsigned int texCoordVBO;
-unsigned int triangleIndexVBO;
+struct VBOS {
+	unsigned int posVBO;
+	unsigned int colorVBO;
+	unsigned int normalVBO;
+	unsigned int texCoordVBO;
+	unsigned int triangleIndexVBO;
+};
+VBOS vbos[3];
+
 
 
 
@@ -89,7 +93,7 @@ void mouseFunc(int button, int state, int x, int y);
 void initContext(int argc, char** argv);
 void initOGL();
 void initShader(const char *vname, const char *fname, unsigned int &, unsigned int &, unsigned int &, size_t);
-void initObj();
+void initObj(size_t);
 void destroy();
 
 
@@ -109,11 +113,15 @@ int main(int argc, char** argv)
 
 	initContext(argc, argv);
 	initOGL();
+
 	initShader("../shaders_P3/shader.v1.vert", "../shaders_P3/shader.v1.frag", program[0], vshader[0], fshader[0], 0);
 	initShader("../shaders_P3/shader.v2.vert", "../shaders_P3/shader.v2.frag", program[1], vshader[1], fshader[1], 1);
 	initShader("../shaders_P3/shader.v3.vert", "../shaders_P3/shader.v3.frag", program[2], vshader[2], fshader[2], 2);
 
-	initObj();
+	initObj(0);
+	initObj(1);
+	initObj(2);
+	
 
 	glutMainLoop();
 
@@ -131,7 +139,7 @@ void initContext(int argc, char** argv)
 	glutInitContextProfile(GLUT_CORE_PROFILE);
 
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-	glutInitWindowSize(500, 500);
+	glutInitWindowSize(800, 800);
 	glutInitWindowPosition(0, 0);
 	glutCreateWindow("Prácticas OGL");
 
@@ -162,9 +170,38 @@ void initOGL()
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glEnable(GL_CULL_FACE);
 
+
+	//Inicializamos las variables de nuestra escena
 	proj = glm::perspective(glm::radians(60.0f), 1.0f, 0.1f, 50.0f);
 	view = glm::mat4(1.0f);
 	view[3].z = -15;
+
+	model[0] = glm::mat4(1.0f);
+	model[1] = glm::mat4(1.0f);
+	model[2] = glm::mat4(1.0f);
+
+	lightPos = glm::vec4(-4.0f, 0.0f, 0.0f, 1.0f);
+	
+	model[2][3].x = lightPos.x;
+	model[2][3].y = lightPos.y;
+	model[2][3].z = lightPos.z;
+
+	lightAmb = glm::vec3(0.3f);
+	lightDif = glm::vec3(1.0f);
+	lightSpec = glm::vec3(1.0f);
+
+	colorTexId1 = loadTex("../img/color2.png");
+	colorTexId2 = loadTex("../img/gioconda.png");
+	emiTexId = loadTex("../img/emissive.png");
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, colorTexId1);
+
+	glActiveTexture(GL_TEXTURE0 + 1);
+	glBindTexture(GL_TEXTURE_2D, colorTexId2);
+
+	glActiveTexture(GL_TEXTURE0 + 2);
+	glBindTexture(GL_TEXTURE_2D, emiTexId);
 }
 
 
@@ -177,18 +214,19 @@ void destroy()
 		glDeleteShader(vshader[i]);
 		glDeleteShader(fshader[i]);
 		glDeleteProgram(program[i]);
+
+		if (attributes[i].inPos != -1) glDeleteBuffers(1, &vbos[i].posVBO);
+		if (attributes[i].inColor != -1) glDeleteBuffers(1, &vbos[i].colorVBO);
+		if (attributes[i].inNormal != -1) glDeleteBuffers(1, &vbos[i].normalVBO);
+		if (attributes[i].inTexCoord != -1) glDeleteBuffers(1, &vbos[i].texCoordVBO);
+
+		glDeleteBuffers(1, &vbos[i].triangleIndexVBO);
+		glDeleteVertexArrays(1, &vao[i]);
 	}
-	
-	if (inPos != -1) glDeleteBuffers(1, &posVBO);
-	if (inColor != -1) glDeleteBuffers(1, &colorVBO);
-	if (inNormal != -1) glDeleteBuffers(1, &normalVBO);
-	if (inTexCoord != -1) glDeleteBuffers(1, &texCoordVBO);
+
 	glDeleteTextures(1, &colorTexId1);
 	glDeleteTextures(1, &colorTexId2);
 	glDeleteTextures(1, &emiTexId);
-	glDeleteBuffers(1, &triangleIndexVBO);
-	glDeleteVertexArrays(1, &vao);
-
 }
 
 void initShader(const char *vname, const char *fname, unsigned int & program, unsigned int & vshader, unsigned int & fshader, size_t i)
@@ -222,10 +260,10 @@ void initShader(const char *vname, const char *fname, unsigned int & program, un
 	glBindAttribLocation(program, 2, "inNormal");
 	glBindAttribLocation(program, 3, "inTexCoord");
 
-	inPos = glGetAttribLocation(program, "inPos");
-	inColor = glGetAttribLocation(program, "inColor");
-	inNormal = glGetAttribLocation(program, "inNormal");
-	inTexCoord = glGetAttribLocation(program, "inTexCoord");
+	attributes[i].inPos = glGetAttribLocation(program, "inPos");
+	attributes[i].inColor = glGetAttribLocation(program, "inColor");
+	attributes[i].inNormal = glGetAttribLocation(program, "inNormal");
+	attributes[i].inTexCoord = glGetAttribLocation(program, "inTexCoord");
 
 	uniforms[i].uNormalMat = glGetUniformLocation(program, "normal");
 	uniforms[i].uModelViewMat = glGetUniformLocation(program, "modelView");
@@ -239,59 +277,47 @@ void initShader(const char *vname, const char *fname, unsigned int & program, un
 }
 
 
-void initObj()
+void initObj(size_t i)
 {
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
+	glGenVertexArrays(1, &vao[i]);
+	glBindVertexArray(vao[i]);
 
-	if (inPos != -1)
+	if (attributes[i].inPos != -1)
 	{
-		glGenBuffers(1, &posVBO);
-		glBindBuffer(GL_ARRAY_BUFFER, posVBO);
+		glGenBuffers(1, &vbos[i].posVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].posVBO);
 		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3, cubeVertexPos, GL_STATIC_DRAW);
-		glVertexAttribPointer(inPos, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(inPos);
+		glVertexAttribPointer(attributes[i].inPos, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[i].inPos);
 	}
-	if (inColor != -1)
+	if (attributes[i].inColor != -1)
 	{
-		glGenBuffers(1, &colorVBO);
-		glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+		glGenBuffers(1, &vbos[i].colorVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].colorVBO);
 		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3, cubeVertexColor, GL_STATIC_DRAW);
-		glVertexAttribPointer(inColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(inColor);
+		glVertexAttribPointer(attributes[i].inColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[i].inColor);
 	}
-	if (inNormal != -1)
+	if (attributes[i].inNormal != -1)
 	{
-		glGenBuffers(1, &normalVBO);
-		glBindBuffer(GL_ARRAY_BUFFER, normalVBO);
+		glGenBuffers(1, &vbos[i].normalVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].normalVBO);
 		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3, cubeVertexNormal, GL_STATIC_DRAW);
-		glVertexAttribPointer(inNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(inNormal);
+		glVertexAttribPointer(attributes[i].inNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[i].inNormal);
 	}
-	if (inTexCoord != -1)
+	if (attributes[i].inTexCoord != -1)
 	{
-		glGenBuffers(1, &texCoordVBO);
-		glBindBuffer(GL_ARRAY_BUFFER, texCoordVBO);
+		glGenBuffers(1, &vbos[i].texCoordVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].texCoordVBO);
 		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 2, cubeVertexTexCoord, GL_STATIC_DRAW);
-		glVertexAttribPointer(inTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(inTexCoord);
+		glVertexAttribPointer(attributes[i].inTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[i].inTexCoord);
 	}
 
-	glGenBuffers(1, &triangleIndexVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, triangleIndexVBO);
+	glGenBuffers(1, &vbos[i].triangleIndexVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos[i].triangleIndexVBO);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeNTriangleIndex * sizeof(unsigned int) * 3, cubeTriangleIndex, GL_STATIC_DRAW);
-
-
-	colorTexId1 = loadTex("../img/color2.png");
-	colorTexId2 = loadTex("../img/gioconda.png");
-	emiTexId = loadTex("../img/emissive.png");
-
-	modelCube1 = glm::mat4(1.0f);
-	modelCube2 = glm::mat4(1.0f);
-	lightPos = glm::vec4(-4.0f, 0.0f, 0.0f, 1.0f);
-	lightAmb = glm::vec3(0.3f);
-	lightDif = glm::vec3(1.0f);
-	lightSpec = glm::vec3(1.0f);
 }
 
 
@@ -361,106 +387,43 @@ void renderFunc()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	//Dibujado del primer cubo
-	glUseProgram(program[0]);
-	//Luz
-	glm::vec4 light = view * lightPos;
-	glUniform4fv(uniforms[0].uLightPos, 1, &light[0]);
-	glUniform3fv(uniforms[0].uLightAmb, 1, &lightAmb[0]);
-	glUniform3fv(uniforms[0].uLightDif, 1, &lightDif[0]);
-	glUniform3fv(uniforms[0].uLightSpec, 1, &lightSpec[0]);
+	glm::vec4 lightViewPos = view * lightPos;
 
-	//Texturas
-	if (uniforms[0].uColorTex != -1)
+	for (int i = 0; i < 3; ++i)
 	{
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, colorTexId1);
-		glUniform1i(uniforms[0].uColorTex, 0);
+		glUseProgram(program[i]);
+
+		glm::mat4 modelView = view * model[i];
+		glm::mat4 modelViewProj = proj * view * model[i];
+		glm::mat4 normal = glm::transpose(glm::inverse(modelView));
+
+		//Matrices uniform
+		if (uniforms[i].uModelViewMat != -1)
+			glUniformMatrix4fv(uniforms[i].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
+		if (uniforms[i].uModelViewProjMat != -1)
+			glUniformMatrix4fv(uniforms[i].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+		if (uniforms[i].uNormalMat != -1)
+			glUniformMatrix4fv(uniforms[i].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+
+		//Texturas uniform
+		if (uniforms[i].uColorTex != -1)
+			glUniform1i(uniforms[0].uColorTex, i);
+		if (uniforms[i].uEmiTex != -1)
+			glUniform1i(uniforms[i].uEmiTex, 2);
+
+		//Otros uniform
+		if(uniforms[i].uLightPos != -1)
+			glUniform4fv(uniforms[i].uLightPos, 1, &lightViewPos[0]);
+		if (uniforms[i].uLightAmb != -1)
+			glUniform3fv(uniforms[i].uLightAmb, 1, &lightAmb[0]);
+		if (uniforms[i].uLightDif != -1)
+			glUniform3fv(uniforms[i].uLightDif, 1, &lightDif[0]);
+		if (uniforms[i].uLightSpec != -1)
+			glUniform3fv(uniforms[i].uLightSpec, 1, &lightSpec[0]);
+
+		glBindVertexArray(vao[i]);
+		glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 	}
-	if (uniforms[0].uEmiTex != -1)
-	{
-		glActiveTexture(GL_TEXTURE0 + 1);
-		glBindTexture(GL_TEXTURE_2D, emiTexId);
-		glUniform1i(uniforms[0].uEmiTex, 1);
-	}
-
-	glm::mat4 modelView = view * modelCube1;
-	glm::mat4 modelViewProj = proj * view * modelCube1;
-	glm::mat4 normal = glm::transpose(glm::inverse(modelView));
-
-	if (uniforms[0].uModelViewMat != -1)
-		glUniformMatrix4fv(uniforms[0].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
-	if (uniforms[0].uModelViewProjMat != -1)
-		glUniformMatrix4fv(uniforms[0].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uniforms[0].uNormalMat != -1)
-		glUniformMatrix4fv(uniforms[0].uNormalMat, 1, GL_FALSE,	&(normal[0][0]));
-
-	glBindVertexArray(vao);
-	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
-
-	//Dibujado del segundo cubo
-	glUseProgram(program[1]);
-	//Luz
-	light = view * lightPos;
-	glUniform4fv(uniforms[1].uLightPos, 1, &light[0]);
-	glUniform3fv(uniforms[1].uLightAmb, 1, &lightAmb[0]);
-	glUniform3fv(uniforms[1].uLightDif, 1, &lightDif[0]);
-	glUniform3fv(uniforms[1].uLightSpec, 1, &lightSpec[0]);
-
-	//Texturas
-	if (uniforms[1].uColorTex != -1)
-	{
-		glActiveTexture(GL_TEXTURE0 + 2);
-		glBindTexture(GL_TEXTURE_2D, colorTexId2);
-		glUniform1i(uniforms[1].uColorTex, 2);
-	}
-
-	modelView = view * modelCube2;
-	modelViewProj = proj * modelView;
-	normal = glm::transpose(glm::inverse(modelView));
-
-	if (uniforms[1].uModelViewMat != -1)
-		glUniformMatrix4fv(uniforms[1].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
-	if (uniforms[1].uModelViewProjMat != -1)
-		glUniformMatrix4fv(uniforms[1].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uniforms[1].uNormalMat != -1)
-		glUniformMatrix4fv(uniforms[1].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
-
-	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
-
-	//Dibujado de un tercer cubo con la posicion de la luz
-	glUseProgram(program[2]);
-	//Luz
-	light = view * lightPos;
-	glUniform4fv(uniforms[2].uLightPos, 1, &light[0]);
-	glUniform3fv(uniforms[2].uLightAmb, 1, &lightAmb[0]);
-	glUniform3fv(uniforms[2].uLightDif, 1, &lightDif[0]);
-	glUniform3fv(uniforms[2].uLightSpec, 1, &lightSpec[0]);
-
-	//Texturas
-	if (uniforms[2].uColorTex != -1)
-	{
-		glActiveTexture(GL_TEXTURE0 + 2);
-		glBindTexture(GL_TEXTURE_2D, colorTexId2);
-		glUniform1i(uniforms[2].uColorTex, 2);
-	}
-
-	glm::mat4 modelLight = glm::mat4(1.0);
-	modelLight[3].x = lightPos.x;
-	modelLight[3].y = lightPos.y;
-	modelLight[3].z = lightPos.z;
-	modelView = view * modelLight;
-	modelViewProj = proj * view * modelLight;
-	normal = glm::transpose(glm::inverse(modelLight));
-
-	if (uniforms[2].uModelViewMat != -1)
-		glUniformMatrix4fv(uniforms[2].uModelViewMat, 1, GL_FALSE, &(modelLight[0][0]));
-	if (uniforms[2].uModelViewProjMat != -1)
-		glUniformMatrix4fv(uniforms[2].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uniforms[12].uNormalMat != -1)
-		glUniformMatrix4fv(uniforms[2].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
-
-	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 
 	glutSwapBuffers();
 }
@@ -483,12 +446,12 @@ void idleFunc()
 	float x = radius * glm::cos(angle);
 	float y = radius * glm::sin(angle);
 
-	modelCube1 = glm::mat4(1.0f);
-	modelCube1 = glm::rotate(modelCube1, angle, glm::vec3(1.0f, 1.0f, 0.0f));
+	model[0] = glm::mat4(1.0f);
+	model[0] = glm::rotate(model[0], angle, glm::vec3(1.0f, 1.0f, 0.0f));
 
-	modelCube2 = glm::mat4(1.0f);
-	modelCube2 = glm::translate(modelCube2, glm::vec3(x, y, x));
-	modelCube2 = glm::rotate(modelCube2, angle, glm::vec3(0.0f, 1.0f, 0.0f));
+	model[1] = glm::mat4(1.0f);
+	model[1] = glm::translate(model[1], glm::vec3(x, y, x));
+	model[1] = glm::rotate(model[1], angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
 	glutPostRedisplay();
 }
@@ -502,21 +465,25 @@ void keyboardFunc(unsigned char key, int x, int y)
 	case('A'):
 	case('a'):
 		lightPos.x -= lightStep;
+		model[2][3].x = lightPos.x;
 		break;
 
 	case('D'):
 	case('d'):
 		lightPos.x += lightStep;
+		model[2][3].x = lightPos.x;
 		break;
 
 	case('W'):
 	case('w'):
 		lightPos.z -= lightStep;
+		model[2][3].z = lightPos.z;
 		break;
 
 	case('S'):
 	case('s'):
 		lightPos.z += lightStep;
+		model[2][3].z = lightPos.z;
 		break;
 
 	case('1'):
@@ -542,8 +509,6 @@ void keyboardFunc(unsigned char key, int x, int y)
 	case('6'):
 		lightSpec = glm::max(lightSpec-glm::vec3(0.1f), glm::vec3(0.0f));
 		break;
-
-
 	}
 
 
