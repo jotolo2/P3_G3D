@@ -1,5 +1,4 @@
 #version 330 core
-
 out vec4 outColor;
 
 in vec3 color;
@@ -7,15 +6,7 @@ in vec3 pos;
 in vec3 norm;
 in vec2 texCoord;
 
-in vec3 Np;
-in vec3 Tp;
-
-
 uniform sampler2D colorTex;
-uniform sampler2D emiTex;
-uniform sampler2D normalTex;
-
-uniform mat4 modelView;
 
 //Propiedades de la luz
 uniform vec4 lightPos;
@@ -42,29 +33,31 @@ uniform SpotLight spotLight;
 vec3 Ka;
 vec3 Kd;
 vec3 Ks;
-vec3 Ke;
 vec3 N;
 float n = 100;
+float alpha = 500.0;
 
 vec3 shade();
 
 void main()
 {
-	Ka = texture(colorTex, texCoord).rgb;
-	Kd = texture(colorTex, texCoord).rgb;
-	Ke = texture(emiTex, texCoord).rgb;
+
+	vec2 tc_aux = texCoord * 3 - 1.5;
+
+	if(((((tc_aux.x * tc_aux.x) + (tc_aux.y * tc_aux.y) - 1)*((tc_aux.x * tc_aux.x) + (tc_aux.y * tc_aux.y) - 1)*((tc_aux.x * tc_aux.x) + (tc_aux.y * tc_aux.y) - 1)) - ( tc_aux.x * tc_aux.x * tc_aux.y * tc_aux.y * tc_aux.y)) < 0)
+	{
+		Ka = vec3(1,0,0);
+		Kd = vec3(1,0,0);
+	}
+	else
+	{
+		Ka = vec3(0,1,0);
+		Kd = vec3(0,1,0);
+	}
+
 	Ks = vec3 (1.0);
 
-
-	N = normalize(Np);
-	vec3 T = normalize(Tp);
-	vec3 B = normalize(cross(N, T));
-	mat3 TBN = transpose(mat3(T, B, N));
-
-	vec3 Nbump = ((texture(normalTex, texCoord).rgb) * 2 - 1);
-	vec3 Nv = (modelView * vec4(normalize(Nbump * TBN), 0.0)).xyz;
-	N = normalize(Nv);
-
+	N = normalize (norm);
 	outColor = vec4(shade(), 1.0);   
 }
 
@@ -72,9 +65,6 @@ vec3 shade()
 {
 	//Ambiental
 	vec3 c = Ia * Ka;
-
-	//Emisiva
-	c += Ke;
 
 	//Luz puntual
 	vec3 lpos = lightPos.xyz;
@@ -90,8 +80,8 @@ vec3 shade()
 	//Especular
 	vec3 V = normalize (-pos);
 	vec3 R = normalize (reflect (-L,N));
-	float factor = max(dot(R,V), 0.0);
-	vec3 specular = atenuation * Is * Ks * pow(factor, n);
+	float factor = max (dot (R,V), 0.01);
+	vec3 specular = atenuation*Is*Ks*pow(factor,alpha);
 	c += clamp(specular, 0.0, 1.0);
 
 	//Luz focal

@@ -1,6 +1,7 @@
 #include "BOX.h"
+#include "PYRAMID.hpp"
 #include "auxiliar.h"
-
+#include <vector>
 
 #include <gl/glew.h>
 #define SOLVE_FGLUT_WARNING
@@ -20,59 +21,106 @@
 //Matrices
 glm::mat4	proj = glm::mat4(1.0f);
 glm::mat4	view = glm::mat4(1.0f);
-glm::mat4	model[3];
+glm::mat4	model[5];
+
+//Otras variables de la luz
+//Propeidades de la fuente de luz focal
+struct SpotLight {
+	glm::vec3 intensity;
+	glm::vec3 position;
+	glm::vec3 direction;
+
+	float constant;
+	float linear;
+	float quadratic;
+
+	float cutOff;
+	float m;
+};
+SpotLight spotLight;
+
+//Propiedades de luz puntual
 glm::vec4	lightPos;
 glm::vec3	lightAmb;
 glm::vec3	lightDif;
 glm::vec3	lightSpec;
 
+// Variables de control de la cámara
+glm::vec3 cameraPos, cameraForward, cameraUp;
+
+// Control del movimiento del ratón
+float x_pressed, y_pressed;
+
+// Puntos de control de trayectoria
+std::vector <glm::vec3> controlPoints;
+bool firstCurve = true;
+bool firstCurve2 = true;
+
+Pyramid pyramid;
+
+
 //////////////////////////////////////////////////////////////
 // Variables que nos dan acceso a Objetos OpenGL
 //////////////////////////////////////////////////////////////
 //Por definir
-unsigned int vshader[3];
-unsigned int fshader[3];
-unsigned int program[3];
+unsigned int vshader[4];
+unsigned int fshader[4];
+unsigned int program[4];
 
 
 //Variables Uniform
+struct UniformsSpotLight {
+	int intensity;
+	int position;
+	int direction;
+	int constant;
+	int linear;
+	int quadratic;
+	int cutOff;
+	int m;
+};
+
 struct Uniforms {
 	int uModelViewMat;
 	int uModelViewProjMat;
 	int uNormalMat;
 	int uColorTex;
 	int uEmiTex;
+	int uNormalTex;
 	int uLightPos;
 	int uLightAmb;
 	int uLightDif;
 	int uLightSpec;
+	UniformsSpotLight uSpotLight;
 };
-Uniforms uniforms[3];
+Uniforms uniforms[4];
 
 //Texturas
-unsigned int colorTexId1, colorTexId2, emiTexId;
+unsigned int colorTexId1, colorTexId2, emiTexId, normalTexId;
 
 //Atributos
 struct Attributes {
 	int inPos;
 	int inColor;
 	int inNormal;
+	int inTangent;
 	int inTexCoord;
 };
-Attributes attributes[3];
+Attributes attributes[4];
 
 
 //VAO
-unsigned int vao[3];
+unsigned int vao[5];
 //VBOs que forman parte del objeto
 struct VBOS {
 	unsigned int posVBO;
 	unsigned int colorVBO;
 	unsigned int normalVBO;
+	unsigned int tangentVBO;
 	unsigned int texCoordVBO;
 	unsigned int triangleIndexVBO;
 };
-VBOS vbos[3];
+VBOS vbos[5];
 
 
 
@@ -88,12 +136,13 @@ void resizeFunc(int width, int height);
 void idleFunc();
 void keyboardFunc(unsigned char key, int x, int y);
 void mouseFunc(int button, int state, int x, int y);
+void mouseMotionFunc(int x, int y);
 
 //Funciones de inicialización y destrucción
 void initContext(int argc, char** argv);
 void initOGL();
 void initShader(const char *vname, const char *fname, unsigned int &, unsigned int &, unsigned int &, size_t);
-void initObj(size_t);
+void initObj(size_t, const float*, const float*, const float*, const float*, const float*, const unsigned int*, int, int);
 void destroy();
 
 
@@ -117,11 +166,15 @@ int main(int argc, char** argv)
 	initShader("../shaders_P3/shader.v1.vert", "../shaders_P3/shader.v1.frag", program[0], vshader[0], fshader[0], 0);
 	initShader("../shaders_P3/shader.v2.vert", "../shaders_P3/shader.v2.frag", program[1], vshader[1], fshader[1], 1);
 	initShader("../shaders_P3/shader.v3.vert", "../shaders_P3/shader.v3.frag", program[2], vshader[2], fshader[2], 2);
+	initShader("../shaders_P3/shader.v4.vert", "../shaders_P3/shader.v4.frag", program[3], vshader[3], fshader[3], 3);
 
-	initObj(0);
-	initObj(1);
-	initObj(2);
-	
+	initObj(0, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
+	initObj(1, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
+	initObj(2, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
+	initObj(3, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
+
+	Pyramid pyramid = Pyramid();
+	initObj(4, pyramid.vertexPos, pyramid.vertexColor, pyramid.vertexNormal, pyramid.vertexTangent, pyramid.vertexTexCoord, pyramid.triangleIndex, pyramid.nVertex, pyramid.nTriangleIndex);
 
 	glutMainLoop();
 
@@ -158,6 +211,8 @@ void initContext(int argc, char** argv)
 	glutIdleFunc(idleFunc);
 	glutKeyboardFunc(keyboardFunc);
 	glutMouseFunc(mouseFunc);
+	glutMotionFunc(mouseMotionFunc);
+	//glutPassiveMotionFunc(mouseMotionFunc);
 }
 
 
@@ -173,26 +228,55 @@ void initOGL()
 
 	//Inicializamos las variables de nuestra escena
 	proj = glm::perspective(glm::radians(60.0f), 1.0f, 0.1f, 50.0f);
+	
 	view = glm::mat4(1.0f);
-	view[3].z = -15;
+	cameraPos = glm::vec3(0.0f, 0.0f, 25.0f);
+	cameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
+	cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 
 	model[0] = glm::mat4(1.0f);
 	model[1] = glm::mat4(1.0f);
 	model[2] = glm::mat4(1.0f);
+	model[3] = glm::mat4(1.0f);
+	model[4] = glm::mat4(1.0f);
 
 	lightPos = glm::vec4(-4.0f, 0.0f, 0.0f, 1.0f);
-	
 	model[2][3].x = lightPos.x;
 	model[2][3].y = lightPos.y;
 	model[2][3].z = lightPos.z;
 
-	lightAmb = glm::vec3(0.3f);
-	lightDif = glm::vec3(1.0f);
+	//La luz focal siempre está ubicada donde la cámara y apuntando hacia donde apunta la misma
+	spotLight = SpotLight();
+	spotLight.intensity = glm::vec3(1);
+	spotLight.position = glm::vec3(0.0, 0.0, 0.0);
+	spotLight.direction = glm::vec3(0, 0, -1);
+	spotLight.constant = 1;
+	spotLight.linear = 0;
+	spotLight.quadratic = 0;
+	spotLight.cutOff = 0.97;
+	spotLight.m = 2;
+
+	lightAmb = glm::vec3(0.15f);
+	lightDif = glm::vec3(0.4f);
 	lightSpec = glm::vec3(1.0f);
+
+	// Creacion de puntos de control
+	glm::vec3 points[] = {
+		glm::vec3(-4.5f,0.0f,0.0f), //P0
+		glm::vec3(-1.5f,8.0f,10.0f), //P1
+		glm::vec3(4.5f,8.0f,10.0f), //P2
+		glm::vec3(4.5f,0.0f,0.0f), //P3
+		glm::vec3(4.5f,-8.0f,-10.0f), //P4
+		glm::vec3(-1.5f,-8.0f,-10.0f), //P5
+	};
+
+	controlPoints.insert(controlPoints.begin(), points, points + 6);
 
 	colorTexId1 = loadTex("../img/color2.png");
 	colorTexId2 = loadTex("../img/gioconda.png");
 	emiTexId = loadTex("../img/emissive.png");
+	normalTexId = loadTex("../img/normal.png");
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, colorTexId1);
@@ -202,12 +286,15 @@ void initOGL()
 
 	glActiveTexture(GL_TEXTURE0 + 2);
 	glBindTexture(GL_TEXTURE_2D, emiTexId);
+
+	glActiveTexture(GL_TEXTURE0 + 3);
+	glBindTexture(GL_TEXTURE_2D, normalTexId);
 }
 
 
 void destroy()
 {
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 4; ++i)
 	{
 		glDetachShader(program[i], vshader[i]);
 		glDetachShader(program[i], fshader[i]);
@@ -227,6 +314,7 @@ void destroy()
 	glDeleteTextures(1, &colorTexId1);
 	glDeleteTextures(1, &colorTexId2);
 	glDeleteTextures(1, &emiTexId);
+	glDeleteTextures(1, &normalTexId);
 }
 
 void initShader(const char *vname, const char *fname, unsigned int & program, unsigned int & vshader, unsigned int & fshader, size_t i)
@@ -258,11 +346,13 @@ void initShader(const char *vname, const char *fname, unsigned int & program, un
 	glBindAttribLocation(program, 0, "inPos");
 	glBindAttribLocation(program, 1, "inColor");
 	glBindAttribLocation(program, 2, "inNormal");
-	glBindAttribLocation(program, 3, "inTexCoord");
+	glBindAttribLocation(program, 3, "inTangent");
+	glBindAttribLocation(program, 4, "inTexCoord");
 
 	attributes[i].inPos = glGetAttribLocation(program, "inPos");
 	attributes[i].inColor = glGetAttribLocation(program, "inColor");
 	attributes[i].inNormal = glGetAttribLocation(program, "inNormal");
+	attributes[i].inTangent = glGetAttribLocation(program, "inTangent");
 	attributes[i].inTexCoord = glGetAttribLocation(program, "inTexCoord");
 
 	uniforms[i].uNormalMat = glGetUniformLocation(program, "normal");
@@ -270,54 +360,75 @@ void initShader(const char *vname, const char *fname, unsigned int & program, un
 	uniforms[i].uModelViewProjMat = glGetUniformLocation(program, "modelViewProj");
 	uniforms[i].uColorTex = glGetUniformLocation(program, "colorTex");
 	uniforms[i].uEmiTex = glGetUniformLocation(program, "emiTex");
+	uniforms[i].uNormalTex = glGetUniformLocation(program, "normalTex");
 	uniforms[i].uLightPos = glGetUniformLocation(program, "lightPos");
 	uniforms[i].uLightAmb = glGetUniformLocation(program, "Ia");
 	uniforms[i].uLightDif = glGetUniformLocation(program, "Id");
 	uniforms[i].uLightSpec = glGetUniformLocation(program, "Is");
+
+	uniforms[i].uSpotLight.intensity = glGetUniformLocation(program, "spotLight.intensity");
+	uniforms[i].uSpotLight.position = glGetUniformLocation(program, "spotLight.position");
+	uniforms[i].uSpotLight.direction = glGetUniformLocation(program, "spotLight.direction");
+	uniforms[i].uSpotLight.constant = glGetUniformLocation(program, "spotLight.constant");
+	uniforms[i].uSpotLight.linear = glGetUniformLocation(program, "spotLight.linear");
+	uniforms[i].uSpotLight.quadratic = glGetUniformLocation(program, "spotLight.quadratic");
+	uniforms[i].uSpotLight.cutOff = glGetUniformLocation(program, "spotLight.cutOff");
+	uniforms[i].uSpotLight.m = glGetUniformLocation(program, "spotLight.m");
 }
 
 
-void initObj(size_t i)
+void initObj(size_t i, const float* vertexPos, const float* vertexColor, const float* vertexNormal, const float* vertexTangent, const float* vertexTexCoord, const unsigned int* triangleIndex, int nVertex, int nTriangleIndex)
 {
 	glGenVertexArrays(1, &vao[i]);
 	glBindVertexArray(vao[i]);
 
-	if (attributes[i].inPos != -1)
+	//Con esto nos aseguramos que los dos últimos VAOs utilizan el mismo shader[3]
+	int j = (i > 3) ? 3 : i;
+
+	if (attributes[j].inPos != -1)
 	{
 		glGenBuffers(1, &vbos[i].posVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].posVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3, cubeVertexPos, GL_STATIC_DRAW);
-		glVertexAttribPointer(attributes[i].inPos, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(attributes[i].inPos);
+		glBufferData(GL_ARRAY_BUFFER, nVertex * sizeof(float) * 3, vertexPos, GL_STATIC_DRAW);
+		glVertexAttribPointer(attributes[j].inPos, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[j].inPos);
 	}
-	if (attributes[i].inColor != -1)
+	if (attributes[j].inColor != -1)
 	{
 		glGenBuffers(1, &vbos[i].colorVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].colorVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3, cubeVertexColor, GL_STATIC_DRAW);
-		glVertexAttribPointer(attributes[i].inColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(attributes[i].inColor);
+		glBufferData(GL_ARRAY_BUFFER, nVertex * sizeof(float) * 3, vertexColor, GL_STATIC_DRAW);
+		glVertexAttribPointer(attributes[j].inColor, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[j].inColor);
 	}
-	if (attributes[i].inNormal != -1)
+	if (attributes[j].inNormal != -1)
 	{
 		glGenBuffers(1, &vbos[i].normalVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].normalVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 3, cubeVertexNormal, GL_STATIC_DRAW);
-		glVertexAttribPointer(attributes[i].inNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(attributes[i].inNormal);
+		glBufferData(GL_ARRAY_BUFFER, nVertex * sizeof(float) * 3, vertexNormal, GL_STATIC_DRAW);
+		glVertexAttribPointer(attributes[j].inNormal, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[j].inNormal);
 	}
-	if (attributes[i].inTexCoord != -1)
+	if (attributes[j].inTangent != -1)
+	{
+		glGenBuffers(1, &vbos[i].tangentVBO);
+		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].tangentVBO);
+		glBufferData(GL_ARRAY_BUFFER, nVertex * sizeof(float) * 3, vertexTangent, GL_STATIC_DRAW);
+		glVertexAttribPointer(attributes[j].inTangent, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[j].inTangent);
+	}
+	if (attributes[j].inTexCoord != -1)
 	{
 		glGenBuffers(1, &vbos[i].texCoordVBO);
 		glBindBuffer(GL_ARRAY_BUFFER, vbos[i].texCoordVBO);
-		glBufferData(GL_ARRAY_BUFFER, cubeNVertex * sizeof(float) * 2, cubeVertexTexCoord, GL_STATIC_DRAW);
-		glVertexAttribPointer(attributes[i].inTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
-		glEnableVertexAttribArray(attributes[i].inTexCoord);
+		glBufferData(GL_ARRAY_BUFFER, nVertex * sizeof(float) * 2, vertexTexCoord, GL_STATIC_DRAW);
+		glVertexAttribPointer(attributes[j].inTexCoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
+		glEnableVertexAttribArray(attributes[j].inTexCoord);
 	}
 
 	glGenBuffers(1, &vbos[i].triangleIndexVBO);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos[i].triangleIndexVBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubeNTriangleIndex * sizeof(unsigned int) * 3, cubeTriangleIndex, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, nTriangleIndex * sizeof(unsigned int) * 3, triangleIndex, GL_STATIC_DRAW);
 }
 
 
@@ -407,9 +518,11 @@ void renderFunc()
 
 		//Texturas uniform
 		if (uniforms[i].uColorTex != -1)
-			glUniform1i(uniforms[0].uColorTex, i);
+			glUniform1i(uniforms[i].uColorTex, i);
 		if (uniforms[i].uEmiTex != -1)
 			glUniform1i(uniforms[i].uEmiTex, 2);
+		if (uniforms[i].uNormalTex != -1)
+			glUniform1i(uniforms[i].uNormalTex, 3);
 
 		//Otros uniform
 		if(uniforms[i].uLightPos != -1)
@@ -421,9 +534,93 @@ void renderFunc()
 		if (uniforms[i].uLightSpec != -1)
 			glUniform3fv(uniforms[i].uLightSpec, 1, &lightSpec[0]);
 
+		//Variables uniform de la luz focal
+		if (uniforms[i].uSpotLight.intensity != -1)
+			glUniform3fv(uniforms[i].uSpotLight.intensity, 1, &spotLight.intensity[0]);
+		if (uniforms[i].uSpotLight.position != -1)
+			glUniform3fv(uniforms[i].uSpotLight.position, 1, &spotLight.position[0]);
+		if (uniforms[i].uSpotLight.direction != -1)
+			glUniform3fv(uniforms[i].uSpotLight.direction, 1, &spotLight.direction[0]);
+		if (uniforms[i].uSpotLight.constant != -1)
+			glUniform1f(uniforms[i].uSpotLight.constant, spotLight.constant);
+		if (uniforms[i].uSpotLight.linear != -1)
+			glUniform1f(uniforms[i].uSpotLight.linear, spotLight.linear);
+		if (uniforms[i].uSpotLight.quadratic != -1)
+			glUniform1f(uniforms[i].uSpotLight.quadratic, spotLight.quadratic);
+		if (uniforms[i].uSpotLight.cutOff != -1)
+			glUniform1f(uniforms[i].uSpotLight.cutOff, spotLight.cutOff);
+		if (uniforms[i].uSpotLight.m != -1)
+			glUniform1f(uniforms[i].uSpotLight.m, spotLight.m);
+
 		glBindVertexArray(vao[i]);
 		glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 	}
+
+	glUseProgram(program[3]);
+
+	glm::mat4 modelView = view * model[3];
+	glm::mat4 modelViewProj = proj * view * model[3];
+	glm::mat4 normal = glm::transpose(glm::inverse(modelView));
+
+	//Matrices uniform
+	if (uniforms[3].uModelViewMat != -1)
+		glUniformMatrix4fv(uniforms[3].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
+	if (uniforms[3].uModelViewProjMat != -1)
+		glUniformMatrix4fv(uniforms[3].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+	if (uniforms[3].uNormalMat != -1)
+		glUniformMatrix4fv(uniforms[3].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+
+	//Texturas uniform
+	if (uniforms[3].uColorTex != -1)
+		glUniform1i(uniforms[0].uColorTex, 3);
+	if (uniforms[3].uEmiTex != -1)
+		glUniform1i(uniforms[3].uEmiTex, 2);
+
+	//Otros uniform
+	if (uniforms[3].uLightPos != -1)
+		glUniform4fv(uniforms[3].uLightPos, 1, &lightViewPos[0]);
+	if (uniforms[3].uLightAmb != -1)
+		glUniform3fv(uniforms[3].uLightAmb, 1, &lightAmb[0]);
+	if (uniforms[3].uLightDif != -1)
+		glUniform3fv(uniforms[3].uLightDif, 1, &lightDif[0]);
+	if (uniforms[3].uLightSpec != -1)
+		glUniform3fv(uniforms[3].uLightSpec, 1, &lightSpec[0]);
+
+	//Variables uniform de la luz focal
+	if (uniforms[3].uSpotLight.intensity != -1)
+		glUniform3fv(uniforms[3].uSpotLight.intensity, 1, &spotLight.intensity[0]);
+	if (uniforms[3].uSpotLight.position != -1)
+		glUniform3fv(uniforms[3].uSpotLight.position, 1, &spotLight.position[0]);
+	if (uniforms[3].uSpotLight.direction != -1)
+		glUniform3fv(uniforms[3].uSpotLight.direction, 1, &spotLight.direction[0]);
+	if (uniforms[3].uSpotLight.constant != -1)
+		glUniform1f(uniforms[3].uSpotLight.constant, spotLight.constant);
+	if (uniforms[3].uSpotLight.linear != -1)
+		glUniform1f(uniforms[3].uSpotLight.linear, spotLight.linear);
+	if (uniforms[3].uSpotLight.quadratic != -1)
+		glUniform1f(uniforms[3].uSpotLight.quadratic, spotLight.quadratic);
+	if (uniforms[3].uSpotLight.cutOff != -1)
+		glUniform1f(uniforms[3].uSpotLight.cutOff, spotLight.cutOff);
+	if (uniforms[3].uSpotLight.m != -1)
+		glUniform1f(uniforms[3].uSpotLight.m, spotLight.m);
+
+	glBindVertexArray(vao[3]);
+	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
+
+	modelView = view * model[4];
+	modelViewProj = proj * view * model[4];
+	normal = glm::transpose(glm::inverse(modelView));
+
+	//Matrices uniform
+	if (uniforms[3].uModelViewMat != -1)
+		glUniformMatrix4fv(uniforms[3].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
+	if (uniforms[3].uModelViewProjMat != -1)
+		glUniformMatrix4fv(uniforms[3].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+	if (uniforms[3].uNormalMat != -1)
+		glUniformMatrix4fv(uniforms[3].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+
+	glBindVertexArray(vao[4]);
+	glDrawElements(GL_TRIANGLES, pyramid.nTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 
 	glutSwapBuffers();
 }
@@ -441,6 +638,8 @@ void resizeFunc(int width, int height)
 void idleFunc()
 {
 	static float angle = 0.0f;
+	static float t = 0.2f;
+	static float t2 = 0.0f;
 	angle = (angle > 3.141592f * 2.0f) ? 0 : angle + 0.01f;
 	float radius = 3.0f;
 	float x = radius * glm::cos(angle);
@@ -453,36 +652,128 @@ void idleFunc()
 	model[1] = glm::translate(model[1], glm::vec3(x, y, x));
 	model[1] = glm::rotate(model[1], angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
+	// Trayectoria de  cuarto cubo
+	glm::vec3 pos;
+	if (t < 1.0f)
+	{
+		t += 0.01f;
+	}
+	else
+	{
+		t = 0.01f;
+		firstCurve = !firstCurve;
+	}
+
+	if (firstCurve)
+	{
+		pos = std::pow((1 - t), 3) * controlPoints[0] + 3 * t * std::pow(1 - t, 2) * controlPoints[1]
+			+ 3 * t * t * (1 - t) * controlPoints[2] + t * t * t * controlPoints[3];
+	}
+	else
+	{
+		pos = std::pow((1 - t), 3) * controlPoints[3] + 3 * t * std::pow(1 - t, 2) * controlPoints[4]
+			+ 3 * t * t * (1 - t) * controlPoints[5] + t * t * t * controlPoints[0];
+	}
+	model[3] = glm::translate(glm::mat4(1.0f), glm::vec3(pos));
+
+	//Trayectoria de quinto cubo
+	if (t2 < 1.0f)
+	{
+		t2 += 0.01f;
+	}
+	else
+	{
+		t2 = 0.01f;
+		firstCurve2 = !firstCurve2;
+	}
+
+	if (firstCurve2)
+	{
+		pos = std::pow((1 - t2), 3) * controlPoints[0] + 3 * t2 * std::pow(1 - t2, 2) * controlPoints[1]
+			+ 3 * t2 * t2 * (1 - t2) * controlPoints[2] + t2 * t2 * t2 * controlPoints[3];
+	}
+	else
+	{
+		pos = std::pow((1 - t2), 3) * controlPoints[3] + 3 * t2 * std::pow(1 - t2, 2) * controlPoints[4]
+			+ 3 * t2 * t2 * (1 - t2) * controlPoints[5] + t2 * t2 * t2 * controlPoints[0];
+	}
+	model[4] = glm::translate(glm::mat4(1.0f), glm::vec3(pos));
+
+
+
 	glutPostRedisplay();
 }
 
 
 void keyboardFunc(unsigned char key, int x, int y)
 {
-	float lightStep = 0.2;
+	float step = 0.2f;
+	glm::vec3 left;
+	glm::mat4 rotation;
 	switch (key)
 	{
 	case('A'):
 	case('a'):
-		lightPos.x -= lightStep;
-		model[2][3].x = lightPos.x;
+		left = glm::normalize(glm::cross(cameraUp, cameraForward));
+		cameraPos = cameraPos + left * step;
+		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
 
 	case('D'):
 	case('d'):
-		lightPos.x += lightStep;
-		model[2][3].x = lightPos.x;
+		left = glm::normalize(glm::cross(cameraUp, cameraForward));
+		cameraPos = cameraPos - left * step;
+		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
 
 	case('W'):
 	case('w'):
-		lightPos.z -= lightStep;
-		model[2][3].z = lightPos.z;
+		cameraPos = cameraPos + cameraForward * step;
+		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
 
 	case('S'):
 	case('s'):
-		lightPos.z += lightStep;
+		cameraPos = cameraPos - cameraForward * step;
+		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
+		break;
+
+	case('Z'):
+	case('z'):
+		rotation = glm::rotate(glm::mat4(1.0f), 0.01f, glm::vec3(0, 1, 0));
+		cameraForward = glm::normalize(glm::vec3( rotation * glm::vec4(cameraForward, 0.0f)));
+		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
+		break;
+
+	case('X'):
+	case('x'):
+		rotation = glm::rotate(glm::mat4(1.0f), -0.01f, glm::vec3(0, 1, 0));
+		cameraForward = glm::normalize(glm::vec3(rotation * glm::vec4(cameraForward, 0.0f)));
+		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
+		break;
+
+
+	case('J'):
+	case('j'):
+		lightPos.x -= step;
+		model[2][3].x = lightPos.x;
+		break;
+
+	case('L'):
+	case('l'):
+		lightPos.x += step;
+		model[2][3].x = lightPos.x;
+		break;
+
+	case('I'):
+	case('i'):
+		lightPos.z -= step;
+		model[2][3].z = lightPos.z;
+		break;
+
+	case('K'):
+	case('k'):
+		lightPos.z += step;
 		model[2][3].z = lightPos.z;
 		break;
 
@@ -511,11 +802,52 @@ void keyboardFunc(unsigned char key, int x, int y)
 		break;
 	}
 
-
 }
 
 
-void mouseFunc(int button, int state, int x, int y){}
+void mouseFunc(int button, int state, int x, int y)
+{
+	if (state == 0)
+	{
+		// Cuando se pulsa el botón izquierdo
+		if (button == 0)
+		{
+			x_pressed = x;
+			y_pressed = y;
+		}
+	}
+}
+
+void mouseMotionFunc(int x, int y)
+{
+	glm::vec3 left;
+	glm::vec4 result;
+	glm::mat4 horizontal_rotation, vertical_rotation;
+
+	// Cálculo del ángulo mediante la diferencia de (raton - raton pulsado)
+	float scale = 0.001f;
+	float angle_x = (x - x_pressed) * scale;
+	float angle_y = (y - y_pressed) * scale;
+
+	left = glm::normalize(glm::cross(cameraForward, cameraUp));
+
+	// Obtención de las rotaciones 
+	horizontal_rotation = glm::rotate(glm::mat4(1.0f), angle_x, glm::vec3(0, 1, 0));
+	vertical_rotation = glm::rotate(glm::mat4(1.0f), angle_y, left);
+
+	// Aplicación de las rotaciones a los dos vectores que determinan la orientación de la cámara
+	result = horizontal_rotation * vertical_rotation * glm::vec4(cameraForward, 0.0f);
+	cameraForward = glm::normalize(glm::vec3(result));
+
+	result = horizontal_rotation * vertical_rotation * glm::vec4(cameraUp, 0.0f);
+	cameraUp = glm::normalize(glm::vec3(result));
+
+	// Reseteamos la matriz de vista con la nueva orientación
+	view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
+
+	x_pressed = x;
+	y_pressed = y;
+}
 
 
 
