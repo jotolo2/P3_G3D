@@ -5,14 +5,13 @@
 
 #include <gl/glew.h>
 #define SOLVE_FGLUT_WARNING
-#include <gl/freeglut.h> 
+#include <gl/freeglut.h>
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
-
 
 //////////////////////////////////////////////////////////////
 // Datos que se almacenan en la memoria de la CPU
@@ -58,7 +57,6 @@ bool firstCurve2 = true;
 
 Pyramid pyramid;
 
-
 //////////////////////////////////////////////////////////////
 // Variables que nos dan acceso a Objetos OpenGL
 //////////////////////////////////////////////////////////////
@@ -66,7 +64,6 @@ Pyramid pyramid;
 unsigned int vshader[4];
 unsigned int fshader[4];
 unsigned int program[4];
-
 
 //Variables Uniform
 struct UniformsSpotLight {
@@ -109,7 +106,6 @@ struct Attributes {
 };
 Attributes attributes[4];
 
-
 //VAO
 unsigned int vao[5];
 //VBOs que forman parte del objeto
@@ -122,9 +118,6 @@ struct VBOS {
 	unsigned int triangleIndexVBO;
 };
 VBOS vbos[5];
-
-
-
 
 //////////////////////////////////////////////////////////////
 // Funciones auxiliares
@@ -142,20 +135,18 @@ void mouseMotionFunc(int x, int y);
 //Funciones de inicialización y destrucción
 void initContext(int argc, char** argv);
 void initOGL();
-void initShader(const char *vname, const char *fname, unsigned int &, unsigned int &, unsigned int &, size_t);
+void initShader(const char* vname, const char* fname, unsigned int&, unsigned int&, unsigned int&, size_t);
 void initObj(size_t, const float*, const float*, const float*, const float*, const float*, const unsigned int*, int, int);
 void destroy();
 
-
 //Carga el shader indicado, devuele el ID del shader
 //!Por implementar
-GLuint loadShader(const char *fileName, GLenum type);
+GLuint loadShader(const char* fileName, GLenum type);
 
-//Crea una textura, la configura, la sube a OpenGL, 
-//y devuelve el identificador de la textura 
+//Crea una textura, la configura, la sube a OpenGL,
+//y devuelve el identificador de la textura
 //!!Por implementar
-unsigned int loadTex(const char *fileName);
-
+unsigned int loadTex(const char* fileName);
 
 int main(int argc, char** argv)
 {
@@ -183,9 +174,9 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-	
+
 //////////////////////////////////////////
-// Funciones auxiliares 
+// Funciones auxiliares
 void initContext(int argc, char** argv)
 {
 	glutInit(&argc, argv);
@@ -216,7 +207,6 @@ void initContext(int argc, char** argv)
 	//glutPassiveMotionFunc(mouseMotionFunc);
 }
 
-
 void initOGL()
 {
 	glEnable(GL_DEPTH_TEST);
@@ -226,10 +216,9 @@ void initOGL()
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glEnable(GL_CULL_FACE);
 
-
 	//Inicializamos las variables de nuestra escena
 	proj = glm::perspective(glm::radians(60.0f), 1.0f, 0.1f, 50.0f);
-	
+
 	view = glm::mat4(1.0f);
 	cameraPos = glm::vec3(0.0f, 0.0f, 25.0f);
 	cameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -296,7 +285,6 @@ void initOGL()
 	glBindTexture(GL_TEXTURE_2D, specularTexId);
 }
 
-
 void destroy()
 {
 	for (int i = 0; i < 4; ++i)
@@ -323,7 +311,7 @@ void destroy()
 	glDeleteTextures(1, &specularTexId);
 }
 
-void initShader(const char *vname, const char *fname, unsigned int & program, unsigned int & vshader, unsigned int & fshader, size_t i)
+void initShader(const char* vname, const char* fname, unsigned int& program, unsigned int& vshader, unsigned int& fshader, size_t i)
 {
 	vshader = loadShader(vname, GL_VERTEX_SHADER);
 	fshader = loadShader(fname, GL_FRAGMENT_SHADER);
@@ -383,7 +371,6 @@ void initShader(const char *vname, const char *fname, unsigned int & program, un
 	uniforms[i].uSpotLight.m = glGetUniformLocation(program, "spotLight.m");
 }
 
-
 void initObj(size_t i, const float* vertexPos, const float* vertexColor, const float* vertexNormal, const float* vertexTangent, const float* vertexTexCoord, const unsigned int* triangleIndex, int nVertex, int nTriangleIndex)
 {
 	glGenVertexArrays(1, &vao[i]);
@@ -438,8 +425,7 @@ void initObj(size_t i, const float* vertexPos, const float* vertexColor, const f
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, nTriangleIndex * sizeof(unsigned int) * 3, triangleIndex, GL_STATIC_DRAW);
 }
 
-
-GLuint loadShader(const char *fileName, GLenum type)
+GLuint loadShader(const char* fileName, GLenum type)
 {
 	unsigned int fileLen;
 	char* source = loadStringFromFile(fileName, fileLen);
@@ -447,7 +433,7 @@ GLuint loadShader(const char *fileName, GLenum type)
 	//Creación y compilación del Shader
 	GLuint shader;
 	shader = glCreateShader(type);
-	glShaderSource(shader, 1, (const GLchar * *)& source, (const GLint*)& fileLen);
+	glShaderSource(shader, 1, (const GLchar**)&source, (const GLint*)&fileLen);
 	glCompileShader(shader);
 	delete[] source;
 
@@ -467,11 +453,10 @@ GLuint loadShader(const char *fileName, GLenum type)
 		glDeleteShader(shader);
 		exit(-1);
 	}
-	return shader; 
+	return shader;
 }
 
-
-unsigned int loadTex(const char *fileName)
+unsigned int loadTex(const char* fileName)
 {
 	unsigned char* map;
 	unsigned int w, h;
@@ -496,16 +481,15 @@ unsigned int loadTex(const char *fileName)
 	GLfloat fLargest;
 	if (glewIsSupported("GL_EXT_texture_filter_anisotropic"))
 	{
-		std::cout << "estamos" << std::endl;
+		std::cout << "anisotropic filtering activated for texture " << fileName << std::endl;
 		isAnisotropic = true;
 	}
-		
+
 	if (isAnisotropic)
 	{
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &fLargest);
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, fLargest);
 	}
-	
 
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -514,7 +498,6 @@ unsigned int loadTex(const char *fileName)
 
 	return texId;
 }
-
 
 void renderFunc()
 {
@@ -549,7 +532,7 @@ void renderFunc()
 			glUniform1i(uniforms[i].uSpecTex, 4);
 
 		//Otros uniform
-		if(uniforms[i].uLightPos != -1)
+		if (uniforms[i].uLightPos != -1)
 			glUniform4fv(uniforms[i].uLightPos, 1, &lightViewPos[0]);
 		if (uniforms[i].uLightAmb != -1)
 			glUniform3fv(uniforms[i].uLightAmb, 1, &lightAmb[0]);
@@ -643,7 +626,6 @@ void renderFunc()
 	glutSwapBuffers();
 }
 
-
 void resizeFunc(int width, int height)
 {
 	glViewport(0, 0, width, height);
@@ -651,7 +633,6 @@ void resizeFunc(int width, int height)
 	proj = glm::perspective(glm::radians(60.0f), aspectRatio, 0.1f, 50.0f);
 	glutPostRedisplay();
 }
-
 
 void idleFunc()
 {
@@ -665,8 +646,6 @@ void idleFunc()
 
 	model[0] = glm::mat4(1.0f);
 	model[0] = glm::rotate(model[0], angle, glm::vec3(1.0f, 1.0f, 0.0f));
-	model[0] = glm::scale(model[0], glm::vec3(3.0, 1.0, 1.0));
-
 
 	model[1] = glm::mat4(1.0f);
 	model[1] = glm::translate(model[1], glm::vec3(x, y, x));
@@ -719,11 +698,8 @@ void idleFunc()
 	}
 	model[4] = glm::translate(glm::mat4(1.0f), glm::vec3(pos));
 
-
-
 	glutPostRedisplay();
 }
-
 
 void keyboardFunc(unsigned char key, int x, int y)
 {
@@ -761,7 +737,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 	case('Z'):
 	case('z'):
 		rotation = glm::rotate(glm::mat4(1.0f), 0.01f, glm::vec3(0, 1, 0));
-		cameraForward = glm::normalize(glm::vec3( rotation * glm::vec4(cameraForward, 0.0f)));
+		cameraForward = glm::normalize(glm::vec3(rotation * glm::vec4(cameraForward, 0.0f)));
 		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
 
@@ -771,7 +747,6 @@ void keyboardFunc(unsigned char key, int x, int y)
 		cameraForward = glm::normalize(glm::vec3(rotation * glm::vec4(cameraForward, 0.0f)));
 		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
-
 
 	case('J'):
 	case('j'):
@@ -798,32 +773,30 @@ void keyboardFunc(unsigned char key, int x, int y)
 		break;
 
 	case('1'):
-		lightAmb = glm::min(lightAmb+glm::vec3(0.1f), glm::vec3(1.0f));
+		lightAmb = glm::min(lightAmb + glm::vec3(0.1f), glm::vec3(1.0f));
 		break;
 
 	case('2'):
-		lightAmb = glm::max(lightAmb-glm::vec3(0.1f), glm::vec3(0.0f));
+		lightAmb = glm::max(lightAmb - glm::vec3(0.1f), glm::vec3(0.0f));
 		break;
 
 	case('3'):
-		lightDif = glm::min(lightDif+glm::vec3(0.1f), glm::vec3(1.0f));
+		lightDif = glm::min(lightDif + glm::vec3(0.1f), glm::vec3(1.0f));
 		break;
 
 	case('4'):
-		lightDif = glm::max(lightDif-glm::vec3(0.1f), glm::vec3(0.0f));
+		lightDif = glm::max(lightDif - glm::vec3(0.1f), glm::vec3(0.0f));
 		break;
 
 	case('5'):
-		lightSpec = glm::min(lightSpec+glm::vec3(0.1f), glm::vec3(1.0f));
+		lightSpec = glm::min(lightSpec + glm::vec3(0.1f), glm::vec3(1.0f));
 		break;
 
 	case('6'):
-		lightSpec = glm::max(lightSpec-glm::vec3(0.1f), glm::vec3(0.0f));
+		lightSpec = glm::max(lightSpec - glm::vec3(0.1f), glm::vec3(0.0f));
 		break;
 	}
-
 }
-
 
 void mouseFunc(int button, int state, int x, int y)
 {
@@ -851,7 +824,7 @@ void mouseMotionFunc(int x, int y)
 
 	left = glm::normalize(glm::cross(cameraForward, cameraUp));
 
-	// Obtención de las rotaciones 
+	// Obtención de las rotaciones
 	horizontal_rotation = glm::rotate(glm::mat4(1.0f), angle_x, glm::vec3(0, 1, 0));
 	vertical_rotation = glm::rotate(glm::mat4(1.0f), angle_y, left);
 
@@ -868,12 +841,3 @@ void mouseMotionFunc(int x, int y)
 	x_pressed = x;
 	y_pressed = y;
 }
-
-
-
-
-
-
-
-
-
