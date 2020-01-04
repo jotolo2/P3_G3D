@@ -14,6 +14,7 @@ in vec3 Tp;
 uniform sampler2D colorTex;
 uniform sampler2D emiTex;
 uniform sampler2D normalTex;
+uniform sampler2D specularTex;
 
 uniform mat4 modelView;
 
@@ -53,7 +54,7 @@ void main()
 	Ka = texture(colorTex, texCoord).rgb;
 	Kd = texture(colorTex, texCoord).rgb;
 	Ke = texture(emiTex, texCoord).rgb;
-	Ks = vec3 (1.0);
+	Ks = texture(specularTex, texCoord).rgb;
 
 
 	N = normalize(Np);

@@ -87,6 +87,7 @@ struct Uniforms {
 	int uColorTex;
 	int uEmiTex;
 	int uNormalTex;
+	int uSpecTex;
 	int uLightPos;
 	int uLightAmb;
 	int uLightDif;
@@ -96,7 +97,7 @@ struct Uniforms {
 Uniforms uniforms[4];
 
 //Texturas
-unsigned int colorTexId1, colorTexId2, emiTexId, normalTexId;
+unsigned int colorTexId1, colorTexId2, emiTexId, normalTexId, specularTexId;
 
 //Atributos
 struct Attributes {
@@ -277,6 +278,7 @@ void initOGL()
 	colorTexId2 = loadTex("../img/gioconda.png");
 	emiTexId = loadTex("../img/emissive.png");
 	normalTexId = loadTex("../img/normal.png");
+	specularTexId = loadTex("../img/specMap.png");
 
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, colorTexId1);
@@ -289,6 +291,9 @@ void initOGL()
 
 	glActiveTexture(GL_TEXTURE0 + 3);
 	glBindTexture(GL_TEXTURE_2D, normalTexId);
+
+	glActiveTexture(GL_TEXTURE0 + 4);
+	glBindTexture(GL_TEXTURE_2D, specularTexId);
 }
 
 
@@ -315,6 +320,7 @@ void destroy()
 	glDeleteTextures(1, &colorTexId2);
 	glDeleteTextures(1, &emiTexId);
 	glDeleteTextures(1, &normalTexId);
+	glDeleteTextures(1, &specularTexId);
 }
 
 void initShader(const char *vname, const char *fname, unsigned int & program, unsigned int & vshader, unsigned int & fshader, size_t i)
@@ -361,6 +367,7 @@ void initShader(const char *vname, const char *fname, unsigned int & program, un
 	uniforms[i].uColorTex = glGetUniformLocation(program, "colorTex");
 	uniforms[i].uEmiTex = glGetUniformLocation(program, "emiTex");
 	uniforms[i].uNormalTex = glGetUniformLocation(program, "normalTex");
+	uniforms[i].uSpecTex = glGetUniformLocation(program, "specularTex");
 	uniforms[i].uLightPos = glGetUniformLocation(program, "lightPos");
 	uniforms[i].uLightAmb = glGetUniformLocation(program, "Ia");
 	uniforms[i].uLightDif = glGetUniformLocation(program, "Id");
@@ -485,6 +492,21 @@ unsigned int loadTex(const char *fileName)
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 
+	bool isAnisotropic = false;
+	GLfloat fLargest;
+	if (glewIsSupported("GL_EXT_texture_filter_anisotropic"))
+	{
+		std::cout << "estamos" << std::endl;
+		isAnisotropic = true;
+	}
+		
+	if (isAnisotropic)
+	{
+		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &fLargest);
+		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, fLargest);
+	}
+	
+
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
@@ -523,6 +545,8 @@ void renderFunc()
 			glUniform1i(uniforms[i].uEmiTex, 2);
 		if (uniforms[i].uNormalTex != -1)
 			glUniform1i(uniforms[i].uNormalTex, 3);
+		if (uniforms[i].uSpecTex != -1)
+			glUniform1i(uniforms[i].uSpecTex, 4);
 
 		//Otros uniform
 		if(uniforms[i].uLightPos != -1)
@@ -569,12 +593,6 @@ void renderFunc()
 		glUniformMatrix4fv(uniforms[3].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
 	if (uniforms[3].uNormalMat != -1)
 		glUniformMatrix4fv(uniforms[3].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
-
-	//Texturas uniform
-	if (uniforms[3].uColorTex != -1)
-		glUniform1i(uniforms[0].uColorTex, 3);
-	if (uniforms[3].uEmiTex != -1)
-		glUniform1i(uniforms[3].uEmiTex, 2);
 
 	//Otros uniform
 	if (uniforms[3].uLightPos != -1)
@@ -647,6 +665,8 @@ void idleFunc()
 
 	model[0] = glm::mat4(1.0f);
 	model[0] = glm::rotate(model[0], angle, glm::vec3(1.0f, 1.0f, 0.0f));
+	model[0] = glm::scale(model[0], glm::vec3(3.0, 1.0, 1.0));
+
 
 	model[1] = glm::mat4(1.0f);
 	model[1] = glm::translate(model[1], glm::vec3(x, y, x));
