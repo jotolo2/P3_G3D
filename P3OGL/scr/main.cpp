@@ -155,16 +155,20 @@ int main(int argc, char** argv)
 	initContext(argc, argv);
 	initOGL();
 
+	//Inicialización de los 4 pares de shaders (los dos ultimos objetos comparten el mismo shader)
 	initShader("../shaders_P3/shader.v1.vert", "../shaders_P3/shader.v1.frag", program[0], vshader[0], fshader[0], 0);
 	initShader("../shaders_P3/shader.v2.vert", "../shaders_P3/shader.v2.frag", program[1], vshader[1], fshader[1], 1);
 	initShader("../shaders_P3/shader.v3.vert", "../shaders_P3/shader.v3.frag", program[2], vshader[2], fshader[2], 2);
 	initShader("../shaders_P3/shader.v4.vert", "../shaders_P3/shader.v4.frag", program[3], vshader[3], fshader[3], 3);
 
+	//Inicialización de 4 cubos y un octaedro
 	initObj(0, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
 	initObj(1, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
 	initObj(2, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
 	initObj(3, cubeVertexPos, cubeVertexColor, cubeVertexNormal, cubeVertexTangent, cubeVertexTexCoord, cubeTriangleIndex, cubeNVertex, cubeNTriangleIndex);
 
+	//OPCIONAL 2.c
+	//CREACIÓN DE UN NUEVO MODELO CON SUS NORMALES Y TANGENTES CALCULADAS
 	Pyramid pyramid = Pyramid();
 	initObj(4, pyramid.vertexPos, pyramid.vertexColor, pyramid.vertexNormal, pyramid.vertexTangent, pyramid.vertexTexCoord, pyramid.triangleIndex, pyramid.nVertex, pyramid.nTriangleIndex);
 
@@ -217,29 +221,34 @@ void initOGL()
 	glEnable(GL_CULL_FACE);
 
 	//Inicializamos las variables de nuestra escena
+	//Matriz de proyección
 	proj = glm::perspective(glm::radians(60.0f), 1.0f, 0.1f, 50.0f);
 
-	view = glm::mat4(1.0f);
-	cameraPos = glm::vec3(0.0f, 0.0f, 25.0f);
+	//Matriz de vista
+	cameraPos = glm::vec3(0.0f, 0.0f, 20.0f);
 	cameraForward = glm::vec3(0.0f, 0.0f, -1.0f);
 	cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 	view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 
+	//Matrices de nuestros modelos
 	model[0] = glm::mat4(1.0f);
 	model[1] = glm::mat4(1.0f);
 	model[2] = glm::mat4(1.0f);
 	model[3] = glm::mat4(1.0f);
 	model[4] = glm::mat4(1.0f);
 
+	//El tercer cubo indica la posición de la luz
 	lightPos = glm::vec4(-4.0f, 0.0f, 0.0f, 1.0f);
 	model[2][3].x = lightPos.x;
 	model[2][3].y = lightPos.y;
 	model[2][3].z = lightPos.z;
 
+	//OPCIONAL 2.d
+	//ILUMINACIÓN DE LA ESCENA CON LUCES DE DISTINTO TIPO (PUNTUAL Y FOCAL)
 	//La luz focal siempre está ubicada donde la cámara y apuntando hacia donde apunta la misma
 	spotLight = SpotLight();
-	spotLight.intensity = glm::vec3(1);
-	spotLight.position = glm::vec3(0.0, 0.0, 0.0);
+	spotLight.intensity = glm::vec3(1.0f);
+	spotLight.position = glm::vec3(0.0f, 0.0f, 0.0f);
 	spotLight.direction = glm::vec3(0, 0, -1);
 	spotLight.constant = 1;
 	spotLight.linear = 0;
@@ -247,11 +256,12 @@ void initOGL()
 	spotLight.cutOff = 0.97;
 	spotLight.m = 2;
 
+	//Propiedades de la luz puntual
 	lightAmb = glm::vec3(0.15f);
 	lightDif = glm::vec3(0.4f);
 	lightSpec = glm::vec3(1.0f);
 
-	// Creacion de puntos de control
+	// Creacion de puntos de control para la órbita de los dos últimos objetos
 	glm::vec3 points[] = {
 		glm::vec3(-4.5f,0.0f,0.0f), //P0
 		glm::vec3(-1.5f,8.0f,10.0f), //P1
@@ -260,9 +270,9 @@ void initOGL()
 		glm::vec3(4.5f,-8.0f,-10.0f), //P4
 		glm::vec3(-1.5f,-8.0f,-10.0f), //P5
 	};
-
 	controlPoints.insert(controlPoints.begin(), points, points + 6);
 
+	//Lectura y carga de texturas
 	colorTexId1 = loadTex("../img/color2.png");
 	colorTexId2 = loadTex("../img/gioconda.png");
 	emiTexId = loadTex("../img/emissive.png");
@@ -281,6 +291,8 @@ void initOGL()
 	glActiveTexture(GL_TEXTURE0 + 3);
 	glBindTexture(GL_TEXTURE_2D, normalTexId);
 
+	//OPCIONAL 2.g
+	//USO DE TEXTURA ESPECULAR
 	glActiveTexture(GL_TEXTURE0 + 4);
 	glBindTexture(GL_TEXTURE_2D, specularTexId);
 }
@@ -343,12 +355,14 @@ void initShader(const char* vname, const char* fname, unsigned int& program, uns
 	glBindAttribLocation(program, 3, "inTangent");
 	glBindAttribLocation(program, 4, "inTexCoord");
 
+	//Almacenamos los identificadores de atributos de todos los shaders
 	attributes[i].inPos = glGetAttribLocation(program, "inPos");
 	attributes[i].inColor = glGetAttribLocation(program, "inColor");
 	attributes[i].inNormal = glGetAttribLocation(program, "inNormal");
 	attributes[i].inTangent = glGetAttribLocation(program, "inTangent");
 	attributes[i].inTexCoord = glGetAttribLocation(program, "inTexCoord");
 
+	//Almacenamos los identificadores de uniforms de todos los shaders
 	uniforms[i].uNormalMat = glGetUniformLocation(program, "normal");
 	uniforms[i].uModelViewMat = glGetUniformLocation(program, "modelView");
 	uniforms[i].uModelViewProjMat = glGetUniformLocation(program, "modelViewProj");
@@ -373,6 +387,7 @@ void initShader(const char* vname, const char* fname, unsigned int& program, uns
 
 void initObj(size_t i, const float* vertexPos, const float* vertexColor, const float* vertexNormal, const float* vertexTangent, const float* vertexTexCoord, const unsigned int* triangleIndex, int nVertex, int nTriangleIndex)
 {
+	//Usamos diferentes VAOs y VBOs debido a que no todos utilizan todos los atributos (dependen de su shader)
 	glGenVertexArrays(1, &vao[i]);
 	glBindVertexArray(vao[i]);
 
@@ -477,6 +492,8 @@ unsigned int loadTex(const char* fileName)
 
 	glGenerateMipmap(GL_TEXTURE_2D);
 
+	//OPCIONAL 1
+	//USO DE FILTRO ANISOTRÓPICO
 	bool isAnisotropic = false;
 	GLfloat fLargest;
 	if (glewIsSupported("GL_EXT_texture_filter_anisotropic"))
@@ -505,6 +522,9 @@ void renderFunc()
 
 	glm::vec4 lightViewPos = view * lightPos;
 
+	//OBLIGATORIO 4
+	//CADA MODELO TIENE SU PROPIA PAREJA DE SHADERS
+	//Los tres primeros modelos utilizan cada uno su propio shader
 	for (int i = 0; i < 3; ++i)
 	{
 		glUseProgram(program[i]);
@@ -523,7 +543,7 @@ void renderFunc()
 
 		//Texturas uniform
 		if (uniforms[i].uColorTex != -1)
-			glUniform1i(uniforms[i].uColorTex, i);
+			glUniform1i(uniforms[i].uColorTex, i); //El primer modelo usa la primera textura, el segundo la segunda textura y el tercero ninguna
 		if (uniforms[i].uEmiTex != -1)
 			glUniform1i(uniforms[i].uEmiTex, 2);
 		if (uniforms[i].uNormalTex != -1)
@@ -531,7 +551,7 @@ void renderFunc()
 		if (uniforms[i].uSpecTex != -1)
 			glUniform1i(uniforms[i].uSpecTex, 4);
 
-		//Otros uniform
+		//Uniforms de la luz puntual
 		if (uniforms[i].uLightPos != -1)
 			glUniform4fv(uniforms[i].uLightPos, 1, &lightViewPos[0]);
 		if (uniforms[i].uLightAmb != -1)
@@ -563,21 +583,12 @@ void renderFunc()
 		glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 	}
 
+	//Los dos últimos modelos usan el mismo shader ([3])
 	glUseProgram(program[3]);
 
-	glm::mat4 modelView = view * model[3];
-	glm::mat4 modelViewProj = proj * view * model[3];
-	glm::mat4 normal = glm::transpose(glm::inverse(modelView));
+	//Uniforms comunes a los dos modelos
 
-	//Matrices uniform
-	if (uniforms[3].uModelViewMat != -1)
-		glUniformMatrix4fv(uniforms[3].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
-	if (uniforms[3].uModelViewProjMat != -1)
-		glUniformMatrix4fv(uniforms[3].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
-	if (uniforms[3].uNormalMat != -1)
-		glUniformMatrix4fv(uniforms[3].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
-
-	//Otros uniform
+	//Uniforms de la luz puntual
 	if (uniforms[3].uLightPos != -1)
 		glUniform4fv(uniforms[3].uLightPos, 1, &lightViewPos[0]);
 	if (uniforms[3].uLightAmb != -1)
@@ -605,14 +616,28 @@ void renderFunc()
 	if (uniforms[3].uSpotLight.m != -1)
 		glUniform1f(uniforms[3].uSpotLight.m, spotLight.m);
 
+	//Primer modelo
+	glm::mat4 modelView = view * model[3];
+	glm::mat4 modelViewProj = proj * view * model[3];
+	glm::mat4 normal = glm::transpose(glm::inverse(modelView));
+
+	//Matrices uniform propias del primer modelo
+	if (uniforms[3].uModelViewMat != -1)
+		glUniformMatrix4fv(uniforms[3].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
+	if (uniforms[3].uModelViewProjMat != -1)
+		glUniformMatrix4fv(uniforms[3].uModelViewProjMat, 1, GL_FALSE, &(modelViewProj[0][0]));
+	if (uniforms[3].uNormalMat != -1)
+		glUniformMatrix4fv(uniforms[3].uNormalMat, 1, GL_FALSE, &(normal[0][0]));
+
 	glBindVertexArray(vao[3]);
 	glDrawElements(GL_TRIANGLES, cubeNTriangleIndex * 3, GL_UNSIGNED_INT, (void*)0);
 
+	//Segundo modelo
 	modelView = view * model[4];
 	modelViewProj = proj * view * model[4];
 	normal = glm::transpose(glm::inverse(modelView));
 
-	//Matrices uniform
+	//Matrices uniform propias del segundo modelo
 	if (uniforms[3].uModelViewMat != -1)
 		glUniformMatrix4fv(uniforms[3].uModelViewMat, 1, GL_FALSE, &(modelView[0][0]));
 	if (uniforms[3].uModelViewProjMat != -1)
@@ -628,6 +653,8 @@ void renderFunc()
 
 void resizeFunc(int width, int height)
 {
+	//OBLIGATORIO 2
+	//DEFINICIÓN DE MATRIZ DE PROYECCIÓN MANTENIENDO EL ASPECT RATIO
 	glViewport(0, 0, width, height);
 	float aspectRatio = float(width) / float(height);
 	proj = glm::perspective(glm::radians(60.0f), aspectRatio, 0.1f, 50.0f);
@@ -637,45 +664,52 @@ void resizeFunc(int width, int height)
 void idleFunc()
 {
 	static float angle = 0.0f;
-	static float t = 0.2f;
-	static float t2 = 0.0f;
 	angle = (angle > 3.141592f * 2.0f) ? 0 : angle + 0.01f;
-	float radius = 3.0f;
-	float x = radius * glm::cos(angle);
-	float y = radius * glm::sin(angle);
-
+	
+	//Rotación sobre el propio eje del primer cubo
 	model[0] = glm::mat4(1.0f);
 	model[0] = glm::rotate(model[0], angle, glm::vec3(1.0f, 1.0f, 0.0f));
 
+	//OBLIGATORIO 3
+	//SEGUNDO CUBO ROTANDO ALREDEDOR DEL PRIMERO EN UNA ÓRBITA OBLICUA Y SOBRE SU EJE Y 
+	float radius = 3.0f;
+	float x = radius * glm::cos(angle);
+	float y = radius * glm::sin(angle);
 	model[1] = glm::mat4(1.0f);
 	model[1] = glm::translate(model[1], glm::vec3(x, y, x));
 	model[1] = glm::rotate(model[1], angle, glm::vec3(0.0f, 1.0f, 0.0f));
 
-	// Trayectoria de  cuarto cubo
+
+	//OPCIONAL 2.b
+	//EL CUARTO Y QUINTO MODELO ORBITAN UNO DETRÁS DE OTRO ALREDEDOR DEL PRIMERO
+	//SIGUIENDO DOS CURVAS DE BEZIER DE 3er GRADO
+	static float t1 = 0.2f;
+	static float t2 = 0.0f;
+	//Trayectoria de  cuarto modelo
 	glm::vec3 pos;
-	if (t < 1.0f)
+	if (t1 < 1.0f)
 	{
-		t += 0.01f;
+		t1 += 0.01f;
 	}
 	else
 	{
-		t = 0.01f;
+		t1 = 0.01f;
 		firstCurve = !firstCurve;
 	}
 
 	if (firstCurve)
 	{
-		pos = std::pow((1 - t), 3) * controlPoints[0] + 3 * t * std::pow(1 - t, 2) * controlPoints[1]
-			+ 3 * t * t * (1 - t) * controlPoints[2] + t * t * t * controlPoints[3];
+		pos = std::pow((1 - t1), 3) * controlPoints[0] + 3 * t1 * std::pow(1 - t1, 2) * controlPoints[1]
+			+ 3 * t1 * t1 * (1 - t1) * controlPoints[2] + t1 * t1 * t1 * controlPoints[3];
 	}
 	else
 	{
-		pos = std::pow((1 - t), 3) * controlPoints[3] + 3 * t * std::pow(1 - t, 2) * controlPoints[4]
-			+ 3 * t * t * (1 - t) * controlPoints[5] + t * t * t * controlPoints[0];
+		pos = std::pow((1 - t1), 3) * controlPoints[3] + 3 * t1 * std::pow(1 - t1, 2) * controlPoints[4]
+			+ 3 * t1 * t1 * (1 - t1) * controlPoints[5] + t1 * t1 * t1 * controlPoints[0];
 	}
 	model[3] = glm::translate(glm::mat4(1.0f), glm::vec3(pos));
 
-	//Trayectoria de quinto cubo
+	//Trayectoria de quinto modelo
 	if (t2 < 1.0f)
 	{
 		t2 += 0.01f;
@@ -708,6 +742,9 @@ void keyboardFunc(unsigned char key, int x, int y)
 	glm::mat4 rotation;
 	switch (key)
 	{
+	//OBLIGATORIO 5
+	//CONTROL DE LA CÁMARA CON EL TECLADO
+	//Adelante, retroceso y movimientos laterales (A,S,D,W) 
 	case('A'):
 	case('a'):
 		left = glm::normalize(glm::cross(cameraUp, cameraForward));
@@ -734,6 +771,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
 
+	//Giros (Z,X)
 	case('Z'):
 	case('z'):
 		rotation = glm::rotate(glm::mat4(1.0f), 0.01f, glm::vec3(0, 1, 0));
@@ -748,6 +786,9 @@ void keyboardFunc(unsigned char key, int x, int y)
 		view = glm::lookAt(cameraPos, cameraPos + cameraForward, cameraUp);
 		break;
 
+	//OBLIGATORIO 1
+	//CONTROL DE LA POSICIÓN E INTENSIDADES DE LA LUZ PUNTUAL POR TECLADO
+	//Adelante, retroceso y movimientos laterales (J,K,L,I)
 	case('J'):
 	case('j'):
 		lightPos.x -= step;
@@ -772,6 +813,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 		model[2][3].z = lightPos.z;
 		break;
 
+	//Intensidad ambiental +,- (1,2)
 	case('1'):
 		lightAmb = glm::min(lightAmb + glm::vec3(0.1f), glm::vec3(1.0f));
 		break;
@@ -780,6 +822,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 		lightAmb = glm::max(lightAmb - glm::vec3(0.1f), glm::vec3(0.0f));
 		break;
 
+	//Intensidad difusa +,- (3,4)
 	case('3'):
 		lightDif = glm::min(lightDif + glm::vec3(0.1f), glm::vec3(1.0f));
 		break;
@@ -788,6 +831,7 @@ void keyboardFunc(unsigned char key, int x, int y)
 		lightDif = glm::max(lightDif - glm::vec3(0.1f), glm::vec3(0.0f));
 		break;
 
+	//Intensidad especular +,- (5,6)
 	case('5'):
 		lightSpec = glm::min(lightSpec + glm::vec3(0.1f), glm::vec3(1.0f));
 		break;
@@ -813,6 +857,8 @@ void mouseFunc(int button, int state, int x, int y)
 
 void mouseMotionFunc(int x, int y)
 {
+	//OPCIONAL 2.a
+	//CONTROL DE LA CÁMARA CON EL RATÓN AL SER PULSADO
 	glm::vec3 left;
 	glm::vec4 result;
 	glm::mat4 horizontal_rotation, vertical_rotation;

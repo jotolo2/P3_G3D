@@ -10,7 +10,6 @@ in vec2 texCoord;
 in vec3 Np;
 in vec3 Tp;
 
-
 uniform sampler2D colorTex;
 uniform sampler2D emiTex;
 uniform sampler2D normalTex;
@@ -18,7 +17,7 @@ uniform sampler2D specularTex;
 
 uniform mat4 modelView;
 
-//Propiedades de la luz
+//Propiedades de la luz puntual
 uniform vec4 lightPos;
 uniform vec3 Ia;
 uniform vec3 Id;
@@ -56,7 +55,8 @@ void main()
 	Ke = texture(emiTex, texCoord).rgb;
 	Ks = texture(specularTex, texCoord).rgb;
 
-
+	//OPCIONAL 2.f
+	//IMPLEMENTACIÓN DEL BUMP MAPPING
 	N = normalize(Np);
 	vec3 T = normalize(Tp);
 	vec3 B = normalize(cross(N, T));
@@ -80,6 +80,9 @@ vec3 shade()
 	//Luz puntual
 	vec3 lpos = lightPos.xyz;
 	vec3 L =  lpos - pos;
+
+	//OPCIONAL 2.e
+	//ATENUACIÓN CON LA DISTANCIA
 	float distance = length(L);
 	float atenuation = min(1 / (spotLight.constant + spotLight.linear * distance + spotLight.quadratic * distance * distance), 1);
 	L = normalize(L);

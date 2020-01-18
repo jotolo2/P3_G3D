@@ -1,4 +1,7 @@
 #version 330 core
+//OPCIONAL 2.h
+//SOMBREADO DEL MODELO DIBUJANDO FIGURA GEOMÉTRICA MEDIANTE COORDENADAS DE TEXTURA
+
 out vec4 outColor;
 
 in vec3 color;
@@ -41,9 +44,9 @@ vec3 shade();
 
 void main()
 {
-
 	vec2 tc_aux = texCoord * 3 - 1.5;
 
+	//Ecuación del corazón
 	if(((((tc_aux.x * tc_aux.x) + (tc_aux.y * tc_aux.y) - 1)*((tc_aux.x * tc_aux.x) + (tc_aux.y * tc_aux.y) - 1)*((tc_aux.x * tc_aux.x) + (tc_aux.y * tc_aux.y) - 1)) - ( tc_aux.x * tc_aux.x * tc_aux.y * tc_aux.y * tc_aux.y)) < 0)
 	{
 		Ka = vec3(1,0,0);
@@ -69,6 +72,9 @@ vec3 shade()
 	//Luz puntual
 	vec3 lpos = lightPos.xyz;
 	vec3 L =  lpos - pos;
+
+	//OPCIONAL 2.e
+	//ATENUACIÓN CON LA DISTANCIA
 	float distance = length(L);
 	float atenuation = min(1 / (spotLight.constant + spotLight.linear * distance + spotLight.quadratic * distance * distance), 1);
 	L = normalize(L);

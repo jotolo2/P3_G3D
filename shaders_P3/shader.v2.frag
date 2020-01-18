@@ -62,6 +62,9 @@ vec3 shade()
 	//Luz puntual
 	vec3 lpos = lightPos.xyz;
 	vec3 L =  lpos - pos;
+
+	//OPCIONAL 2.e
+	//ATENUACIÓN CON LA DISTANCIA
 	float distance = length(L);
 	float atenuation = min(1 / (spotLight.constant + spotLight.linear * distance + spotLight.quadratic * distance * distance), 1);
 	L = normalize(L);
